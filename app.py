@@ -1,27 +1,42 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
+import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-st.set_page_config(page_title="📗 Google Sheets 連結示範", layout="centered")
-st.title("📗 使用公開 Google Sheets 與 Streamlit 整合")
+st.set_page_config(page_title="📗 Google Sheets Demo", layout="centered")
 
-# 替換為你的 Google Sheet 公開網址
-url = "https://docs.google.com/spreadsheets/d/1VV2AXV7-ZudWApvRiuKW8gcehXOM1CaPXGyHyFvDPQE/edit?usp=sharing"
+st.title("📗 Streamlit + Google Sheets")
+st.write("本應用示範如何使用服務帳戶連接 Google Sheets 並讀取資料。")
 
-st.header("1️⃣ 讀取公開 Google Sheet 為 DataFrame")
+# ========================
+# Google Sheets 認證設定
+# ========================
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+creds_dict = st.secrets["gcp_service_account"]
 
-with st.echo():
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read(spreadsheet=url, usecols=[0, 1])
+# 使用金鑰授權
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
+
+# ========================
+# Google Sheet 讀取與顯示
+# ========================
+
+# 將此處換成你實際要讀取的試算表名稱
+SHEET_NAME = "ys-map"
+WORKSHEET_INDEX = 0  # 預設第一個工作表
+
+try:
+    sheet = client.open(SHEET_NAME).get_worksheet(WORKSHEET_INDEX)
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
+
+    st.success("✅ 成功連接並讀取 Google Sheets 資料")
     st.dataframe(df)
 
-st.divider()
-st.header("2️⃣ 使用 SQL 查詢 Google Sheet")
-st.info("⚠️ 注意：SQL 查詢僅於記憶體內執行，不會影響實際 Google Sheet 資料", icon="ℹ️")
-
-with st.echo():
-    # Query 範例，請注意工作表名稱（例如 "Example 2"）
-    df_sql = conn.query(
-        'SELECT births FROM "sheet1" LIMIT 10',
-        spreadsheet=url
-    )
-    st.dataframe(df_sql)
+except Exception as e:
+    st.error("❌ 讀取 Google Sheets 時發生錯誤：")
+    st.exception(e)
